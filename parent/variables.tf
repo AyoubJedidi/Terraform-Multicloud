@@ -21,7 +21,7 @@ variable "environment" {
   description = "Environment name: dev, staging, or prod"
   type        = string
   default     = "dev"
-  
+
   # Ensures only valid values
   validation {
     condition     = contains(["dev", "staging", "prod"], var.environment)
@@ -32,7 +32,7 @@ variable "environment" {
 variable "project_name" {
   description = "Project name (used in resource naming)"
   type        = string
-  
+
   # Must be provided by user
   validation {
     condition     = length(var.project_name) > 0
@@ -48,7 +48,7 @@ variable "deployment_type" {
   description = "Deployment type: 'webapp' (PaaS) or 'docker-vm' (VM with Docker)"
   type        = string
   default     = "webapp"
-  
+
   validation {
     condition     = contains(["webapp", "docker-vm"], var.deployment_type)
     error_message = "deployment_type must be 'webapp' or 'docker-vm'"
@@ -58,7 +58,7 @@ variable "deployment_type" {
 variable "cloud_provider" {
   description = "Cloud provider: azure, aws, or gcp"
   type        = string
-  
+
   validation {
     condition     = contains(["azure", "aws", "gcp"], var.cloud_provider)
     error_message = "cloud_provider must be azure, aws, or gcp"
@@ -122,11 +122,11 @@ variable "registry_server" {
 variable "registry_username" {
   description = "Container registry username"
   type        = string
-  sensitive   = true  # Hides value in logs
+  sensitive   = true # Hides value in logs
 }
 
 variable "registry_password" {
   description = "Container registry password"
   type        = string
-  sensitive   = true  # Hides value in logs
+  sensitive   = true # Hides value in logs
 }

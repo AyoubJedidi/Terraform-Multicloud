@@ -26,3 +26,4 @@ Thumbs.db
 .crash.log
 .terraform.lock.hcl
 .idea/
+terraform.tfvars.example

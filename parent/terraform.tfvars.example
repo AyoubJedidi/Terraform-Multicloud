@@ -1,0 +1,43 @@
+# ============================================================
+# TERRAFORM VARIABLES TEMPLATE
+# ============================================================
+# SETUP INSTRUCTIONS:
+# 1. Copy: cp terraform.tfvars.example terraform.tfvars
+# 2. Fill in your actual values below
+# 3. NEVER commit terraform.tfvars to Git!
+# ============================================================
+
+# Project Configuration
+project_name         = "YOUR_PROJECT_NAME"
+environment          = "dev"
+cloud_provider       = "azure"
+deployment_type      = "webapp"
+
+# Azure Configuration
+azure_resource_group = "YOUR_RESOURCE_GROUP"
+azure_location       = "francecentral"
+
+# Container Registry (⚠️ SECRETS!)
+docker_image        = "YOUR_ACR.azurecr.io/YOUR_APP:latest"
+registry_server     = "YOUR_ACR.azurecr.io"
+registry_username   = "YOUR_ACR_USERNAME"
+registry_password   = "YOUR_ACR_PASSWORD"
+
+# GCP (required but can be dummy)
+gcp_project = "dummy-project-id"
+
+# ============================================================
+# EXAMPLE (DO NOT USE DIRECTLY):
+# ============================================================
+# project_name         = "petclinic"
+# environment          = "dev"
+# cloud_provider       = "azure"
+# deployment_type      = "webapp"
+# azure_resource_group = "terraform-petclinic-rg"
+# azure_location       = "francecentral"
+# docker_image        = "acrfrance4570.azurecr.io/petclinic:latest"
+# registry_server     = "acrfrance4570.azurecr.io"
+# registry_username   = "acrfrance4570"
+# registry_password   = "YOUR_ACTUAL_PASSWORD_HERE"
+# gcp_project = "dummy-project-id"
+# ============================================================

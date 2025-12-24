@@ -1,7 +1,22 @@
 # Terraform
 .terraform/
 *.tfstate
-*.tfstate.*
-.crash.log
+*.tfstate.backup
+*.tfplan
 .terraform.lock.hcl
+
+# SECRETS - NEVER COMMIT THESE!
+terraform.tfvars
+*.auto.tfvars
+**/*.tfvars
+deployment-outputs.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
 .idea/
+*.swp
+*.swo

@@ -1,0 +1,66 @@
+name: Terraform Deploy
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+env:
+  TF_VAR_project_name: petclinic
+  TF_VAR_environment: dev
+  TF_VAR_cloud_provider: azure
+  TF_VAR_deployment_type: webapp
+  TF_VAR_azure_resource_group: terraform-petclinic-rg
+  TF_VAR_azure_location: francecentral
+  TF_VAR_docker_image: ${{ secrets.ACR_SERVER }}/petclinic:latest
+  TF_VAR_registry_server: ${{ secrets.ACR_SERVER }}
+  TF_VAR_registry_username: ${{ secrets.ACR_USERNAME }}
+  TF_VAR_registry_password: ${{ secrets.ACR_PASSWORD }}
+  TF_VAR_gcp_project: dummy-project
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.10.3
+    
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Terraform Init
+      working-directory: ./parent
+      run: terraform init
+    
+    - name: Terraform Validate
+      working-directory: ./parent
+      run: terraform validate
+    
+    - name: Terraform Plan
+      working-directory: ./parent
+      run: terraform plan
+    
+    - name: Terraform Apply
+      working-directory: ./parent
+      if: github.ref == 'refs/heads/master'
+      run: terraform apply -auto-approve
+    
+    - name: Get Outputs
+      working-directory: ./parent
+      run: |
+        echo "Deployment URL: $(terraform output -raw deployment_url)"
+        terraform output -json > ../deployment-outputs.json
+    
+    - name: Upload Outputs
+      uses: actions/upload-artifact@v3
+      with:
+        name: terraform-outputs
+        path: deployment-outputs.json

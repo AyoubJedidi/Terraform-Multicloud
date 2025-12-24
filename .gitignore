@@ -19,3 +19,10 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.crash.log
+.terraform.lock.hcl
+.idea/

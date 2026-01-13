@@ -1,29 +1,43 @@
-# Terraform
+# ============================================================
+# TERRAFORM
+# ============================================================
 .terraform/
+.terraform.lock.hcl
 *.tfstate
+*.tfstate.*
 *.tfstate.backup
 *.tfplan
-.terraform.lock.hcl
+*.tfplan.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 
+# ============================================================
 # SECRETS - NEVER COMMIT
+# ============================================================
 terraform.tfvars
 *.auto.tfvars
 **/*.tfvars
+!*.tfvars.example
 deployment-outputs.json
+env.sh
+.env
 
-# OS
+# ============================================================
+# OS FILES
+# ============================================================
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*~
 
+# ============================================================
 # IDE
+# ============================================================
 .vscode/
 .idea/
-*.swp
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.*
-.crash.log
-.terraform.lock.hcl
-.idea/
-terraform.tfvars.example
+*.iml

@@ -13,25 +13,25 @@
 
 terraform {
   required_version = ">= 1.0"
-  
+
   # Cloud provider plugins
   required_providers {
     # Azure Provider
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0"  # Any 3.x version
+      version = "~> 3.0" # Any 3.x version
     }
-    
+
     # AWS Provider
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"  # Any 5.x version
+      version = "~> 5.0" # Any 5.x version
     }
-    
+
     # GCP Provider
     google = {
       source  = "hashicorp/google"
-      version = "~> 5.0"  # Any 5.x version
+      version = "~> 5.0" # Any 5.x version
     }
   }
 }
@@ -42,7 +42,7 @@ terraform {
 # Authenticates using Azure CLI (az login)
 # If running in Jenkins, use service principal
 provider "azurerm" {
-  features {}  # Required block for Azure
+  features {} # Required block for Azure
 }
 
 # ============================================================

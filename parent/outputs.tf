@@ -2,15 +2,6 @@
 # OUTPUTS.TF
 # ============================================================
 # PURPOSE: Display deployment results
-#
-# WHAT IT DOES:
-# 1. Shows information after terraform apply completes
-# 2. Jenkins/CI reads these values
-# 3. User sees URLs, IPs, resource names
-#
-# HOW TO USE:
-#   terraform output app_url
-#   terraform output -json > deployment.json
 # ============================================================
 
 # ============================================================
@@ -18,17 +9,17 @@
 # ============================================================
 
 output "deployment_type" {
-  description = "Type of deployment (webapp or docker-vm)"
+  description = "Type of deployment"
   value       = var.deployment_type
 }
 
 output "cloud_provider" {
-  description = "Cloud provider used (azure, aws, or gcp)"
+  description = "Cloud provider used"
   value       = var.cloud_provider
 }
 
 output "environment" {
-  description = "Environment (dev, staging, prod)"
+  description = "Environment"
   value       = var.environment
 }
 
@@ -38,48 +29,69 @@ output "project_name" {
 }
 
 # ============================================================
-# WEB APP OUTPUTS (if deployment_type = "webapp")
+# UNIFIED OUTPUTS (Works for any cloud)
 # ============================================================
 
-output "webapp_url" {
-  description = "Web App production URL"
-  value       = var.deployment_type == "webapp" ? try(module.webapp[0].app_url, "Not deployed") : "N/A"
+output "deployment_url" {
+  description = "Deployment URL (web app)"
+  value = (
+    var.deployment_type == "webapp" ? (
+      var.cloud_provider == "azure" ? try(module.azure_webapp[0].app_url, "N/A") :
+      var.cloud_provider == "aws" ? try(module.aws_webapp[0].app_url, "N/A") :
+      var.cloud_provider == "gcp" ? try(module.gcp_webapp[0].app_url, "N/A") :
+      "N/A"
+    ) : "N/A (VM deployment - check vm_ip)"
+  )
 }
 
-output "webapp_staging_url" {
-  description = "Web App staging URL (Blue/Green)"
-  value       = var.deployment_type == "webapp" ? try(module.webapp[0].staging_url, "Not deployed") : "N/A"
+output "staging_url" {
+  description = "Staging URL (if Blue/Green enabled)"
+  value = (
+    var.deployment_type == "webapp" && var.cloud_provider == "azure" ?
+    try(module.azure_webapp[0].staging_url, "N/A") : "N/A"
+  )
 }
-
-output "webapp_name" {
-  description = "Web App resource name"
-  value       = var.deployment_type == "webapp" ? try(module.webapp[0].app_name, "Not deployed") : "N/A"
-}
-
-# ============================================================
-# VM OUTPUTS (if deployment_type = "docker-vm")
-# ============================================================
 
 output "vm_ip" {
-  description = "VM public IP address"
-  value       = var.deployment_type == "docker-vm" ? try(module.docker_vm[0].vm_ip, "Not deployed") : "N/A"
-}
-
-output "vm_ssh_command" {
-  description = "SSH command to connect to VM"
-  value       = var.deployment_type == "docker-vm" ? try(module.docker_vm[0].ssh_command, "Not deployed") : "N/A"
-}
-
-output "vm_name" {
-  description = "VM resource name"
-  value       = var.deployment_type == "docker-vm" ? try(module.docker_vm[0].vm_name, "Not deployed") : "N/A"
+  description = "VM IP address (if docker-vm deployment)"
+  value = (
+    var.deployment_type == "docker-vm" ? (
+      var.cloud_provider == "azure" ? try(module.azure_docker_vm[0].vm_ip, "N/A") :
+      var.cloud_provider == "aws" ? try(module.aws_docker_vm[0].vm_ip, "N/A") :
+      var.cloud_provider == "gcp" ? try(module.gcp_docker_vm[0].vm_ip, "N/A") :
+      "N/A"
+    ) : "N/A (webapp deployment - check deployment_url)"
+  )
 }
 
 # ============================================================
-# RESOURCE GROUP (Azure only)
+# CLOUD-SPECIFIC OUTPUTS
 # ============================================================
 
-output "resource_group_name" {
+# Azure
+output "azure_webapp_url" {
+  description = "Azure Web App URL"
+  value       = var.cloud_provider == "azure" && var.deployment_type == "webapp" ? try(module.azure_webapp[0].app_url, "N/A") : "N/A"
+}
+
+output "azure_webapp_name" {
+  description = "Azure Web App name"
+  value       = var.cloud_provider == "azure" && var.deployment_type == "webapp" ? try(module.azure_webapp[0].app_name, "N/A") : "N/A"
+}
+
+output "azure_resource_group" {
   description = "Azure resource group name"
-  value       = var.cloud_provider == "azure" ? try(azurerm_resource_group.main[0].name, "Not created") : "N/A"
+  value       = var.cloud_provider == "azure" ? try(azurerm_resource_group.main[0].name, "N/A") : "N/A"
+}
+
+# AWS
+output "aws_webapp_url" {
+  description = "AWS ECS URL"
+  value       = var.cloud_provider == "aws" && var.deployment_type == "webapp" ? try(module.aws_webapp[0].app_url, "N/A") : "N/A"
+}
+
+# GCP
+output "gcp_webapp_url" {
+  description = "GCP Cloud Run URL"
+  value       = var.cloud_provider == "gcp" && var.deployment_type == "webapp" ? try(module.gcp_webapp[0].app_url, "N/A") : "N/A"
 }

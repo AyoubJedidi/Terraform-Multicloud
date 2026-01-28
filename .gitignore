@@ -41,6 +41,44 @@ env.sh
 .env
 
 # ============================================================
+# ANSIBLE - Secrets & Generated Files
+# ============================================================
+
+# SSH Keys (NEVER commit these)
+ansible-deployment/ssh_keys/
+ansible-deployment/**/*.pem
+ansible-deployment/**/*.key
+ansible-deployment/**/id_rsa*
+
+# Generated inventory files (contain IPs and credentials)
+ansible-deployment/inventory/*.ini
+!ansible-deployment/inventory/*.ini.example
+
+# Terraform outputs for Ansible (sensitive)
+ansible-deployment/terraform_outputs.json
+
+# Environment files with credentials
+ansible-deployment/existing_vm.env
+ansible-deployment/*.env
+!ansible-deployment/*.env.example
+
+# Vault password files
+ansible-deployment/.vault_pass
+ansible-deployment/vault_password.yml
+
+# Ansible facts cache
+ansible-deployment/.ansible/
+/tmp/ansible_facts/
+
+# Test results and temporary files
+ansible-deployment/logs/
+ansible-deployment/**/*.log
+ansible-deployment/LOCAL_TEST_RESULTS.md
+ansible-deployment/LOCAL_TESTING_COMPLETE.md
+ansible-deployment/PLAYBOOK_GUIDE.md
+ansible-deployment/PRE_PUSH_CHECKLIST.md
+
+# ============================================================
 # OS FILES
 # ============================================================
 .DS_Store
@@ -56,3 +94,29 @@ Thumbs.db
 .idea/
 *.iml
 .vscode-server/
+
+# ============================================================
+# PYTHON
+# ============================================================
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+venv/
+.venv/
+
+# ============================================================
+# OTHER
+# ============================================================
+# Credentials files
+**/credentials.txt
+**/secrets.txt
+**/*-credentials.txt
+**/*_credentials.json
+**/vault-credentials.txt
+**/azure-vault-credentials.txt
+
+# Temporary files
+tmp/
+temp/
+*.tmp

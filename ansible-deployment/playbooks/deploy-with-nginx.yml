@@ -1,0 +1,57 @@
+---
+- name: Deploy with Nginx Reverse Proxy
+  hosts: all
+  gather_facts: yes
+  become: yes
+  
+  vars:
+    app_name: petclinic
+    app_host_port: 8080
+    acr_server: "{{ lookup('env', 'ACR_SERVER') | default('', true) }}"
+    acr_username: "{{ lookup('env', 'ACR_USERNAME') | default('', true) }}"
+    acr_password: "{{ lookup('env', 'ACR_PASSWORD') | default('', true) }}"
+    install_docker: "{{ lookup('env', 'INSTALL_DOCKER') | default('auto', true) }}"
+    install_nginx: "{{ lookup('env', 'INSTALL_NGINX') | default('auto', true) }}"
+  
+  pre_tasks:
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_installed
+      ignore_errors: yes
+      changed_when: false
+    
+    - name: Check if Nginx is installed
+      command: nginx -v
+      register: nginx_installed
+      ignore_errors: yes
+      changed_when: false
+    
+    - name: Set installation flags
+      set_fact:
+        should_install_docker: "{{ docker_installed.rc != 0 and install_docker != 'no' }}"
+        should_install_nginx: "{{ nginx_installed.rc != 0 and install_nginx != 'no' }}"
+    
+    - name: Show status
+      debug:
+        msg:
+          - "Docker: {{ 'Installed' if docker_installed.rc == 0 else 'Will install' }}"
+          - "Nginx: {{ 'Installed' if nginx_installed.rc == 0 else 'Will install' }}"
+  
+  roles:
+    - bootstrap
+    - role: docker
+      when: should_install_docker | bool
+    - app-deploy
+    - role: nginx
+      when: should_install_nginx | bool or install_nginx == 'yes'
+  
+  post_tasks:
+    - name: Show access URLs
+      debug:
+        msg:
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "✅ DEPLOYMENT COMPLETE"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "Direct:  http://{{ ansible_host | default('localhost') }}:{{ app_host_port }}"
+          - "Nginx:   http://{{ ansible_host | default('localhost') }}"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

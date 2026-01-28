@@ -1,0 +1,56 @@
+---
+- name: Smart Deployment (Auto-detect and Install)
+  hosts: all
+  gather_facts: yes
+  become: yes
+  
+  vars:
+    app_name: petclinic
+    app_host_port: 8080
+    with_nginx: false
+    acr_server: "{{ lookup('env', 'ACR_SERVER') | default('', true) }}"
+    acr_username: "{{ lookup('env', 'ACR_USERNAME') | default('', true) }}"
+    acr_password: "{{ lookup('env', 'ACR_PASSWORD') | default('', true) }}"
+  
+  pre_tasks:
+    - name: Check Docker
+      command: docker --version
+      register: docker_check
+      ignore_errors: yes
+      changed_when: false
+    
+    - name: Check Nginx
+      command: nginx -v
+      register: nginx_check
+      ignore_errors: yes
+      changed_when: false
+    
+    - name: Show what will be installed
+      debug:
+        msg:
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "INSTALLATION PLAN"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "Docker: {{ 'Already installed ✅' if docker_check.rc == 0 else 'Will install 📦' }}"
+          - "Nginx:  {{ 'Already installed ✅' if nginx_check.rc == 0 else ('Will install 📦' if with_nginx else 'Skipped ⏭️') }}"
+          - "App:    Will deploy 🚀"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  
+  roles:
+    - bootstrap
+    - role: docker
+      when: docker_check.rc != 0
+    - app-deploy
+    - role: nginx
+      when: with_nginx | bool and nginx_check.rc != 0
+  
+  post_tasks:
+    - name: Show results
+      debug:
+        msg:
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "✅ DEPLOYMENT COMPLETE"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "Direct:  http://{{ ansible_host | default('localhost') }}:{{ app_host_port }}"
+          - "{{ 'Nginx:   http://' + (ansible_host | default('localhost')) if with_nginx else 'Nginx:   Not configured' }}"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

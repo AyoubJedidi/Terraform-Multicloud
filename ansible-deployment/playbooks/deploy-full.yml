@@ -1,0 +1,52 @@
+---
+- name: Complete Application Deployment
+  hosts: all
+  gather_facts: yes
+  become: yes
+  
+  vars:
+    app_name: petclinic
+    app_host_port: 8080
+    acr_server: "{{ lookup('env', 'ACR_SERVER') | default('', true) }}"
+    acr_username: "{{ lookup('env', 'ACR_USERNAME') | default('', true) }}"
+    acr_password: "{{ lookup('env', 'ACR_PASSWORD') | default('', true) }}"
+    install_docker: "{{ lookup('env', 'INSTALL_DOCKER') | default('auto', true) }}"
+  
+  pre_tasks:
+    - name: Show deployment info
+      debug:
+        msg:
+          - "Target: {{ inventory_hostname }}"
+          - "Image: {{ app_image }}"
+          - "Port: {{ app_host_port }}"
+    
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_installed
+      ignore_errors: yes
+      changed_when: false
+    
+    - name: Set Docker installation flag
+      set_fact:
+        should_install_docker: "{{ docker_installed.rc != 0 and install_docker != 'no' }}"
+    
+    - name: Show Docker status
+      debug:
+        msg: "Docker installed: {{ docker_installed.rc == 0 }}, Will install: {{ should_install_docker }}"
+  
+  roles:
+    - bootstrap
+    - role: docker
+      when: should_install_docker | bool
+    - app-deploy
+  
+  post_tasks:
+    - name: Show deployment summary
+      debug:
+        msg:
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "✅ DEPLOYMENT COMPLETE"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "Application: http://{{ ansible_host | default('localhost') }}:{{ app_host_port }}"
+          - "Docker: {{ 'Already installed' if not (should_install_docker | bool) else 'Newly installed' }}"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

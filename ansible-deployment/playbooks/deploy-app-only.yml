@@ -1,0 +1,16 @@
+---
+- name: Deploy Application Only
+  hosts: all
+  gather_facts: yes
+  become: yes
+  
+  vars:
+    app_name: petclinic
+    app_image: "{{ acr_server | default('localhost') }}/petclinic:latest"
+    app_host_port: 8080
+    acr_server: "{{ lookup('env', 'ACR_SERVER') }}"
+    acr_username: "{{ lookup('env', 'ACR_USERNAME') }}"
+    acr_password: "{{ lookup('env', 'ACR_PASSWORD') }}"
+  
+  roles:
+    - app-deploy

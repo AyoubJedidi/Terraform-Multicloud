@@ -1,0 +1,25 @@
+---
+- name: Check if Python3 is installed
+  raw: command -v python3
+  register: python3_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Install Python3 if missing
+  raw: |
+    apt-get update
+    apt-get install -y python3 python3-pip
+  when: python3_check is failed  # Changed this line
+  become: yes
+
+- name: Verify Python installation
+  raw: python3 --version
+  register: python_version
+  changed_when: false
+
+- name: Show Python version
+  debug:
+    msg: "Python version: {{ python_version.stdout }}"
+
+- name: Gather facts (now that Python exists)
+  setup:

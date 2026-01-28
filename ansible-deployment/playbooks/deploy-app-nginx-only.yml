@@ -1,0 +1,34 @@
+---
+- name: Deploy App with Nginx (Skip Docker Installation)
+  hosts: all
+  gather_facts: yes
+  become: yes
+  
+  vars:
+    app_name: petclinic
+    app_host_port: 8082
+    acr_server: "{{ lookup('env', 'ACR_SERVER') | default('', true) }}"
+    acr_username: "{{ lookup('env', 'ACR_USERNAME') | default('', true) }}"
+    acr_password: "{{ lookup('env', 'ACR_PASSWORD') | default('', true) }}"
+  
+  tasks:
+    - name: Show deployment info
+      debug:
+        msg:
+          - "Deploying: {{ app_image }}"
+          - "Port: {{ app_host_port }}"
+  
+  roles:
+    - app-deploy
+    - nginx
+  
+  post_tasks:
+    - name: Show access URLs
+      debug:
+        msg:
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "✅ DEPLOYMENT COMPLETE"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          - "Direct:  http://localhost:{{ app_host_port }}"
+          - "Nginx:   http://localhost"
+          - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

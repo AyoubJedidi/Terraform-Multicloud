@@ -1,23 +1,13 @@
-name: Azure VM Deployment with Ansible
+name: Azure VM Deployment
 
 on:
   push:
-    branches: [ main ]  # ✅ Already correct
-    paths:
-      - 'terraform/**'
-      - 'ansible-deployment/**'
-      - '.github/workflows/**'
-  pull_request:
     branches: [ main ]
   workflow_dispatch:
     inputs:
       destroy_after:
-        description: 'Destroy VM after deployment (yes/no)'
-        required: false
         default: 'no'
       app_image:
-        description: 'Docker image to deploy'
-        required: false
         default: 'nginx:alpine'
 
 env:
@@ -31,70 +21,60 @@ env:
 
 jobs:
   terraform-provision:
-    name: 🏗️ Provision Azure VM
+    name: 🏗️ Provision VM
     runs-on: ubuntu-latest
     
     outputs:
       vm_ip: ${{ steps.output.outputs.vm_ip }}
-      vm_username: ${{ steps.output.outputs.vm_username }}
     
     defaults:
       run:
         working-directory: terraform/parent
     
     steps:
-      - name: 📦 Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-      - name: 🔧 Setup Terraform
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
           terraform_wrapper: false
       
-      - name: 🔑 Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Azure Login
+        run: |
+          az login --service-principal \
+            --username ${{ secrets.AZURE_CLIENT_ID }} \
+            --password ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+          
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       
-      - name: 🎯 Terraform Init
+      - name: Terraform Init
         run: terraform init
       
-      - name: 📋 Terraform Validate
-        run: terraform validate
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
       
-      - name: 📊 Terraform Plan
-        run: terraform plan -out=tfplan
-      
-      - name: 🚀 Terraform Apply
-        run: terraform apply -auto-approve tfplan
-      
-      - name: 📤 Export Terraform Outputs
+      - name: Export Outputs
         id: output
         run: |
           VM_IP=$(terraform output -raw vm_public_ip)
-          VM_USER=$(terraform output -raw vm_username)
-          
           echo "vm_ip=$VM_IP" >> $GITHUB_OUTPUT
-          echo "vm_username=$VM_USER" >> $GITHUB_OUTPUT
-          
-          echo "✅ VM Created: $VM_IP"
           
           terraform output -json > terraform_outputs.json
           terraform output -raw vm_private_key > vm_private_key.pem
           chmod 600 vm_private_key.pem
       
-      - name: 📦 Upload Terraform Artifacts
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: terraform-outputs
           path: |
             terraform/parent/terraform_outputs.json
             terraform/parent/vm_private_key.pem
-          retention-days: 1
 
   ansible-deploy:
-    name: 🚀 Deploy with Ansible
+    name: 🚀 Deploy App
     needs: terraform-provision
     runs-on: ubuntu-latest
     
@@ -103,122 +83,54 @@ jobs:
         working-directory: ansible-deployment
     
     steps:
-      - name: 📦 Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-      - name: 🔧 Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      
-      - name: 📦 Install Dependencies
+      - name: Install Ansible
         run: |
           sudo apt-get update
           sudo apt-get install -y software-properties-common jq
           sudo add-apt-repository --yes --update ppa:ansible/ansible
           sudo apt-get install -y ansible
-          ansible --version
       
-      - name: 📥 Download Terraform Outputs
+      - name: Download Outputs
         uses: actions/download-artifact@v4
         with:
           name: terraform-outputs
           path: terraform-outputs
       
-      - name: 🔐 Setup Files
+      - name: Setup Files
         run: |
           mkdir -p ssh_keys
           cp ../terraform-outputs/vm_private_key.pem ssh_keys/azure_vm.pem
           chmod 600 ssh_keys/azure_vm.pem
           cp ../terraform-outputs/terraform_outputs.json .
       
-      - name: 📝 Generate Inventory
+      - name: Generate Inventory
         run: |
           chmod +x generate_inventory.sh
           ./generate_inventory.sh
-          cat inventory/hosts.ini
       
-      - name: ⏳ Wait for VM SSH
+      - name: Wait for SSH
         run: |
           VM_IP="${{ needs.terraform-provision.outputs.vm_ip }}"
-          echo "Waiting for SSH on $VM_IP..."
-          
           for i in {1..30}; do
             if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
-                   -i ssh_keys/azure_vm.pem \
-                   azureuser@$VM_IP "echo 'Ready'"; then
-              echo "✅ SSH ready!"
+                   -i ssh_keys/azure_vm.pem azureuser@$VM_IP "echo Ready"; then
               exit 0
             fi
-            echo "Attempt $i/30..."
             sleep 10
           done
-          
-          echo "❌ SSH timeout"
           exit 1
       
-      - name: 🧪 Test Ansible
-        run: |
-          ansible all -m ping
-          ansible all -m command -a "hostname"
-      
-      - name: 🐳 Deploy Application
-        env:
-          APP_IMAGE: ${{ github.event.inputs.app_image || 'nginx:alpine' }}
+      - name: Deploy
         run: |
           ansible-playbook playbooks/deploy-smart.yml \
-            -e "app_image=$APP_IMAGE" \
-            -e "app_name=webapp" \
+            -e "app_image=${{ github.event.inputs.app_image || 'nginx:alpine' }}" \
             -e "app_host_port=80" \
-            -e "app_container_port=80" \
-            -e "with_nginx=false" \
-            -v
+            -e "app_container_port=80"
       
-      - name: ✅ Verify Deployment
+      - name: Summary
         run: |
           VM_IP="${{ needs.terraform-provision.outputs.vm_ip }}"
-          
-          sleep 15
-          
-          echo "Testing from VM..."
-          ansible all -m shell -a "curl -I http://localhost:80"
-          
-          echo ""
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "🎉 DEPLOYMENT SUCCESSFUL"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "VM IP:        $VM_IP"
-          echo "Application:  http://$VM_IP"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          
+          echo "🎉 Deployed to: http://$VM_IP"
           ansible all -m shell -a "docker ps"
-
-  terraform-destroy:
-    name: 🗑️ Cleanup
-    needs: [terraform-provision, ansible-deploy]
-    runs-on: ubuntu-latest
-    if: github.event.inputs.destroy_after == 'yes'
-    
-    defaults:
-      run:
-        working-directory: terraform/parent
-    
-    steps:
-      - name: 📦 Checkout Code
-        uses: actions/checkout@v4
-      
-      - name: 🔧 Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-      
-      - name: 🔑 Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-      
-      - name: 🎯 Terraform Init
-        run: terraform init
-      
-      - name: 🗑️ Terraform Destroy
-        run: terraform destroy -auto-approve

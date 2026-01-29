@@ -1,85 +1,48 @@
 # ============================================================
-# OUTPUTS.TF
-# ============================================================
-# PURPOSE: Display deployment results
-#
-# WHAT IT DOES:
-# 1. Shows information after terraform apply completes
-# 2. Jenkins/CI reads these values
-# 3. User sees URLs, IPs, resource names
-#
-# HOW TO USE:
-#   terraform output app_url
-#   terraform output -json > deployment.json
+# OUTPUTS
 # ============================================================
 
-# ============================================================
-# DEPLOYMENT INFO
-# ============================================================
-
-output "deployment_type" {
-  description = "Type of deployment (webapp or docker-vm)"
-  value       = var.deployment_type
+# Azure WebApp Outputs
+output "azure_webapp_url" {
+  description = "Azure Web App URL"
+  value       = var.cloud_provider == "azure" && var.deployment_type == "webapp" ? module.azure_webapp[0].webapp_url : null
 }
 
-output "cloud_provider" {
-  description = "Cloud provider used (azure, aws, or gcp)"
-  value       = var.cloud_provider
+# Azure Docker VM Outputs
+output "vm_public_ip" {
+  description = "Public IP of the VM"
+  value       = var.cloud_provider == "azure" && var.deployment_type == "docker-vm" ? module.azure_docker_vm[0].vm_public_ip : null
 }
 
-output "environment" {
-  description = "Environment (dev, staging, prod)"
-  value       = var.environment
+output "vm_private_key" {
+  description = "Private SSH key for VM"
+  value       = var.cloud_provider == "azure" && var.deployment_type == "docker-vm" ? module.azure_docker_vm[0].vm_private_key : null
+  sensitive   = true
 }
 
-output "project_name" {
-  description = "Project name"
-  value       = var.project_name
+output "vm_username" {
+  description = "VM username"
+  value       = var.cloud_provider == "azure" && var.deployment_type == "docker-vm" ? module.azure_docker_vm[0].vm_username : "azureuser"
 }
-
-# ============================================================
-# WEB APP OUTPUTS (if deployment_type = "webapp")
-# ============================================================
-
-output "webapp_url" {
-  description = "Web App production URL"
-  value       = var.deployment_type == "webapp" ? try(module.webapp[0].app_url, "Not deployed") : "N/A"
-}
-
-output "webapp_staging_url" {
-  description = "Web App staging URL (Blue/Green)"
-  value       = var.deployment_type == "webapp" ? try(module.webapp[0].staging_url, "Not deployed") : "N/A"
-}
-
-output "webapp_name" {
-  description = "Web App resource name"
-  value       = var.deployment_type == "webapp" ? try(module.webapp[0].app_name, "Not deployed") : "N/A"
-}
-
-# ============================================================
-# VM OUTPUTS (if deployment_type = "docker-vm")
-# ============================================================
 
 output "vm_ip" {
-  description = "VM public IP address"
-  value       = var.deployment_type == "docker-vm" ? try(module.docker_vm[0].vm_ip, "Not deployed") : "N/A"
+  description = "VM IP (alias for Ansible)"
+  value       = var.cloud_provider == "azure" && var.deployment_type == "docker-vm" ? module.azure_docker_vm[0].vm_public_ip : null
 }
 
-output "vm_ssh_command" {
-  description = "SSH command to connect to VM"
-  value       = var.deployment_type == "docker-vm" ? try(module.docker_vm[0].ssh_command, "Not deployed") : "N/A"
+output "vm_user" {
+  description = "VM User (alias for Ansible)"
+  value       = var.cloud_provider == "azure" && var.deployment_type == "docker-vm" ? module.azure_docker_vm[0].vm_username : "azureuser"
 }
 
-output "vm_name" {
-  description = "VM resource name"
-  value       = var.deployment_type == "docker-vm" ? try(module.docker_vm[0].vm_name, "Not deployed") : "N/A"
+# AWS Outputs (when implemented)
+output "aws_webapp_url" {
+  description = "AWS App URL"
+  value       = var.cloud_provider == "aws" && var.deployment_type == "webapp" ? "TBD" : null
 }
 
-# ============================================================
-# RESOURCE GROUP (Azure only)
-# ============================================================
-
-output "resource_group_name" {
-  description = "Azure resource group name"
-  value       = var.cloud_provider == "azure" ? try(azurerm_resource_group.main[0].name, "Not created") : "N/A"
+# GCP Outputs (when implemented)
+output "gcp_webapp_url" {
+  description = "GCP App URL"
+  value       = var.cloud_provider == "gcp" && var.deployment_type == "webapp" ? "TBD" : null
 }

@@ -1,7 +1,11 @@
 ---
-- name: Check if this is a local image or registry image
+- name: Determine if registry image
   set_fact:
-    is_registry_image: "{{ acr_server is defined and acr_server != '' and acr_server != 'localhost' }}"
+    is_registry_image: true
+
+- name: Show image info
+  debug:
+    msg: "Deploying image: {{ app_image }}"
 
 - name: Login to container registry
   docker_login:
@@ -9,30 +13,16 @@
     username: "{{ acr_username }}"
     password: "{{ acr_password }}"
   when: 
-    - is_registry_image | bool
+    - acr_server is defined
+    - acr_server != ''
     - acr_username is defined
     - acr_username != ''
   no_log: true
 
-- name: Pull application image from registry
+- name: Pull application image
   docker_image:
     name: "{{ app_image }}"
     source: pull
-    force_source: yes
-  when: is_registry_image | bool
-
-- name: Check if local image exists
-  docker_image_info:
-    name: "{{ app_image }}"
-  register: local_image_info
-  when: not (is_registry_image | bool)
-
-- name: Fail if local image doesn't exist
-  fail:
-    msg: "Local image {{ app_image }} not found. Please build it first with: docker build -t {{ app_image }}"
-  when:
-    - not (is_registry_image | bool)
-    - local_image_info.images | length == 0
 
 - name: Stop old container
   docker_container:
@@ -52,7 +42,7 @@
 - name: Wait for application to be ready
   wait_for:
     port: "{{ app_host_port }}"
-    delay: 10
+    delay: 5
     timeout: 120
 
 - name: Check application health
@@ -61,7 +51,6 @@
     status_code: 200
   retries: 10
   delay: 5
-  register: health_check
 
 - name: Show deployment status
   debug:

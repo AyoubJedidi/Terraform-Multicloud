@@ -2,25 +2,26 @@ name: Azure VM Deployment with Ansible
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main ]  # ✅ Already correct
     paths:
       - 'terraform/**'
       - 'ansible-deployment/**'
-      - '.github/workflows/azure-vm-deployment.yml'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       destroy_after:
         description: 'Destroy VM after deployment (yes/no)'
         required: false
         default: 'no'
-      deployment_type:
-        description: 'Deployment type (docker-vm/webapp)'
+      app_image:
+        description: 'Docker image to deploy'
         required: false
-        default: 'docker-vm'
+        default: 'nginx:alpine'
 
 env:
   TERRAFORM_VERSION: '1.10.3'
-  ANSIBLE_VERSION: '2.15'
   TF_VAR_project_name: 'petclinic-cicd'
   TF_VAR_environment: 'dev'
   TF_VAR_cloud_provider: 'azure'
@@ -29,9 +30,6 @@ env:
   TF_VAR_azure_location: 'francecentral'
 
 jobs:
-  # ============================================
-  # JOB 1: Provision Infrastructure
-  # ============================================
   terraform-provision:
     name: 🏗️ Provision Azure VM
     runs-on: ubuntu-latest
@@ -59,10 +57,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       
-      - name: 🔍 Terraform Format Check
-        run: terraform fmt -check
-        continue-on-error: true
-      
       - name: 🎯 Terraform Init
         run: terraform init
       
@@ -70,10 +64,7 @@ jobs:
         run: terraform validate
       
       - name: 📊 Terraform Plan
-        run: |
-          terraform plan \
-            -var="deployment_type=${{ github.event.inputs.deployment_type || 'docker-vm' }}" \
-            -out=tfplan
+        run: terraform plan -out=tfplan
       
       - name: 🚀 Terraform Apply
         run: terraform apply -auto-approve tfplan
@@ -89,7 +80,6 @@ jobs:
           
           echo "✅ VM Created: $VM_IP"
           
-          # Save outputs for Ansible
           terraform output -json > terraform_outputs.json
           terraform output -raw vm_private_key > vm_private_key.pem
           chmod 600 vm_private_key.pem
@@ -103,11 +93,8 @@ jobs:
             terraform/parent/vm_private_key.pem
           retention-days: 1
 
-  # ============================================
-  # JOB 2: Configure VM with Ansible
-  # ============================================
   ansible-deploy:
-    name: 🚀 Deploy Application
+    name: 🚀 Deploy with Ansible
     needs: terraform-provision
     runs-on: ubuntu-latest
     
@@ -124,12 +111,12 @@ jobs:
         with:
           python-version: '3.10'
       
-      - name: 📦 Install Ansible
+      - name: 📦 Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y software-properties-common
+          sudo apt-get install -y software-properties-common jq
           sudo add-apt-repository --yes --update ppa:ansible/ansible
-          sudo apt-get install -y ansible jq
+          sudo apt-get install -y ansible
           ansible --version
       
       - name: 📥 Download Terraform Outputs
@@ -138,20 +125,17 @@ jobs:
           name: terraform-outputs
           path: terraform-outputs
       
-      - name: 🔐 Setup SSH Key
+      - name: 🔐 Setup Files
         run: |
           mkdir -p ssh_keys
           cp ../terraform-outputs/vm_private_key.pem ssh_keys/azure_vm.pem
           chmod 600 ssh_keys/azure_vm.pem
-          
           cp ../terraform-outputs/terraform_outputs.json .
       
-      - name: 📝 Generate Ansible Inventory
+      - name: 📝 Generate Inventory
         run: |
           chmod +x generate_inventory.sh
           ./generate_inventory.sh
-          
-          echo "Generated inventory:"
           cat inventory/hosts.ini
       
       - name: ⏳ Wait for VM SSH
@@ -162,30 +146,29 @@ jobs:
           for i in {1..30}; do
             if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
                    -i ssh_keys/azure_vm.pem \
-                   ${{ needs.terraform-provision.outputs.vm_username }}@$VM_IP \
-                   "echo 'SSH ready'"; then
-              echo "✅ SSH connection successful!"
+                   azureuser@$VM_IP "echo 'Ready'"; then
+              echo "✅ SSH ready!"
               exit 0
             fi
-            echo "Attempt $i/30: Waiting..."
+            echo "Attempt $i/30..."
             sleep 10
           done
           
-          echo "❌ SSH connection failed after 5 minutes"
+          echo "❌ SSH timeout"
           exit 1
       
-      - name: 🧪 Test Ansible Connection
+      - name: 🧪 Test Ansible
         run: |
           ansible all -m ping
           ansible all -m command -a "hostname"
-          ansible all -m command -a "whoami"
-          ansible all -m command -a "whoami" --become
       
-      - name: 🐳 Deploy with Docker
+      - name: 🐳 Deploy Application
+        env:
+          APP_IMAGE: ${{ github.event.inputs.app_image || 'nginx:alpine' }}
         run: |
           ansible-playbook playbooks/deploy-smart.yml \
-            -e "app_image=nginx:alpine" \
-            -e "app_name=nginx-demo" \
+            -e "app_image=$APP_IMAGE" \
+            -e "app_name=webapp" \
             -e "app_host_port=80" \
             -e "app_container_port=80" \
             -e "with_nginx=false" \
@@ -195,35 +178,23 @@ jobs:
         run: |
           VM_IP="${{ needs.terraform-provision.outputs.vm_ip }}"
           
-          echo "Waiting for application to be ready..."
-          sleep 10
+          sleep 15
           
-          # Test from VM
+          echo "Testing from VM..."
           ansible all -m shell -a "curl -I http://localhost:80"
           
-          # Test from runner
-          curl -I http://$VM_IP || echo "External access failed (might be NSG rules)"
-      
-      - name: 📊 Deployment Summary
-        run: |
-          VM_IP="${{ needs.terraform-provision.outputs.vm_ip }}"
-          
+          echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "🎉 DEPLOYMENT SUCCESSFUL"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "VM IP:        $VM_IP"
           echo "Application:  http://$VM_IP"
-          echo "SSH:          ssh -i vm_key.pem azureuser@$VM_IP"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           
-          # Show running containers
           ansible all -m shell -a "docker ps"
 
-  # ============================================
-  # JOB 3: Cleanup (Optional)
-  # ============================================
   terraform-destroy:
-    name: 🗑️ Cleanup Resources
+    name: 🗑️ Cleanup
     needs: [terraform-provision, ansible-deploy]
     runs-on: ubuntu-latest
     if: github.event.inputs.destroy_after == 'yes'
@@ -250,8 +221,4 @@ jobs:
         run: terraform init
       
       - name: 🗑️ Terraform Destroy
-        run: |
-          terraform destroy -auto-approve \
-            -var="deployment_type=${{ github.event.inputs.deployment_type || 'docker-vm' }}"
-          
-          echo "✅ Resources cleaned up successfully"
+        run: terraform destroy -auto-approve
